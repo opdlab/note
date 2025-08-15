@@ -336,7 +336,7 @@
 
             let currentDisplayTitle = null; 
             let currentRawTitleLines = [];  
-            let currentBodyLines = [];     
+            let currentBodyLines = [];      
 
             function storeCurrentPassage() {
                 if (currentDisplayTitle || currentBodyLines.length > 0) {
@@ -364,9 +364,15 @@
                 return parts.filter(p => p && String(p).trim()).join(" "); // Changed ". " to " "
             }
 
-            const newTopTitlePattern = /^\s*\[\s*([A-Za-z0-9]+)\s*\]\s*$/; 
-            const newMidTitlePattern = /^\s*([A-Za-z0-9]+|Add)\s*\)\s*$/;    
-
+            // =================================================================
+            // ▼▼▼ 2. 챕터 및 강 인식 규칙 변경 부분 ▼▼▼
+            // =================================================================
+            const newTopTitlePattern = /^\s*\[\s*(.+)\s*\]\s*$/;
+            const newMidTitlePattern = /^\s*([^\]]+)\]\s*$/;
+            // =================================================================
+            // ▲▲▲ 2. 챕터 및 강 인식 규칙 변경 부분 ▲▲▲
+            // =================================================================
+            
             const unitPattern = /^(UNIT\s+\d+.*)$/i;
             const numericTopPattern = /^(0\d+.*)$/i; 
             const grammarPattern = /^\s*GRAMMAR\s+for\s+Reading\s*$/i;
@@ -650,7 +656,7 @@
                         const aiData = await getAIData(passageObj.originalFullText); 
                         if (!aiData) {
                             console.error(`AI 데이터 생성 실패 (null/undefined 반환): ${passageObj.title}`);
-                            updateStatus(`지문 "${passageObj.title}"에 대한 AI 데이터 생성에 실패했습니다. 이 지문을 건너<0xEA><0xB3><0x8D>니다.`, "error");
+                            updateStatus(`지문 "${passageObj.title}"에 대한 AI 데이터 생성에 실패했습니다. 이 지문을 건너뜁니다.`, "error");
                             continue; 
                         }
                         
@@ -717,10 +723,10 @@
                             page: {
                                 size: { orientation: PageOrientation.PORTRAIT, width: convertInchesToTwip(8.27), height: convertInchesToTwip(11.69) }, 
                                 margin: { 
-                                    top: cmToTwip(2.3), 
-                                    right: cmToTwip(1.8), 
-                                    bottom: cmToTwip(2.3), 
-                                    left: cmToTwip(1.8) 
+                                    top: cmToTwip(1.5), 
+                                    right: cmToTwip(1.5), 
+                                    bottom: cmToTwip(1.5), 
+                                    left: cmToTwip(1.5) 
                                 },
                             },
                         },
@@ -861,11 +867,14 @@
 For the following English passage (where the first line or first few lines might be a title/header and the rest is the main body), provide the requested information in JSON format according to the schema.
 CRITICALLY IMPORTANT: The translations (free_translation_korean, direct_translation_korean), theme, keywords, and hashtags should be based ONLY on the MAIN BODY of the passage, EXCLUDING any initial title or header lines.
 
+// =================================================================
+// ▼▼▼ 1. 핵심 키워드 추출 규칙 변경 부분 ▼▼▼
+// =================================================================
 IMPORTANT INSTRUCTION FOR 'keywords':
-Select key English vocabulary items (words, idioms, short phrases) from ONLY THE MAIN BODY.
-For each 'english' keyword:
-  - If it's a general word/phrase, the 'korean' field MUST be its PURE KOREAN translation.
-  - **Exception for Proper Nouns/Acronyms:** If the 'english' keyword is a proper noun or a common acronym typically used AS IS in Korean contexts OR if its Korean translation would be awkward, then the 'korean' field SHOULD BE THE ORIGINAL ENGLISH TERM ITSELF.
+From ONLY THE MAIN BODY, select about 15 **core keywords** that are most critical to understanding the passage's main idea, theme, and logical flow. These should be words or short phrases whose meaning is essential to the overall context, not just common vocabulary.
+// =================================================================
+// ▲▲▲ 1. 핵심 키워드 추출 규칙 변경 부분 ▲▲▲
+// =================================================================
 
 IMPORTANT INSTRUCTION FOR 'direct_translation_korean':
 This field is for internal keyword consistency and WILL NOT BE DISPLAYED. It MUST be a literal Korean direct translation (직역) of ONLY THE MAIN BODY.
@@ -904,9 +913,9 @@ Provide JSON output only.`;
                     responseSchema: schema
                 }
             };
-            // Updated API URL to use gemini-2.5-flash-preview-05-20
-            // gemini-2.5-flash-preview-05-20를 사용하도록 API URL 업데이트
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${userApiKey}`; 
+            // Updated API URL to use gemini-1.5-flash-latest
+            // gemini-1.5-flash-latest를 사용하도록 API URL 업데이트
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${userApiKey}`; 
 
             try {
                 const response = await fetch(apiUrl, {
@@ -931,7 +940,7 @@ Provide JSON output only.`;
                         if (parsedJson.direct_translation_korean) {
                             parsedJson.direct_translation_korean = parsedJson.direct_translation_korean
                                 .replace(/<[^>]*>/g, " ") 
-                                .replace(/\*\*/g, "")    
+                                .replace(/\*\*/g, "")   
                                 .replace(/\s+/g, ' ').trim(); 
                         } else {
                             console.warn("'direct_translation_korean' field is missing or null in AI response. Setting to empty string."); 
@@ -1379,4 +1388,3 @@ Provide JSON output only.`;
 </body>
 
 </html>
-
