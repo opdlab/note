@@ -131,208 +131,203 @@
       </div>
     </div>
 
-    <script type="module">
-        // 라이브러리 모듈 가져오기
-        const { Packer, Document, Paragraph, TextRun, HeadingLevel, PageOrientation, PageBreak, convertInchesToTwip, Table, TableCell, TableRow, WidthType, BorderStyle, VerticalAlign, HeightRule, LineRuleType, AlignmentType } = docx;
+    // 라이브러리 모듈 가져오기
+const { Packer, Document, Paragraph, TextRun, HeadingLevel, PageOrientation, PageBreak, convertInchesToTwip, Table, TableCell, TableRow, WidthType, BorderStyle, VerticalAlign, HeightRule, LineRuleType, AlignmentType } = docx;
 
-        // UI 요소 참조
-        const fileInput = document.getElementById('fileInput');
-        const uploadTriggerButton = document.getElementById('uploadTriggerButton'); 
-        const uploadButton = document.getElementById('uploadButton'); 
-        const apiKeyInput = document.getElementById('apiKeyInput');
-        const dropZone = document.getElementById('dropZone');
-        
-        const passageDisplay = document.getElementById('passageDisplay');
-        const passageSelectionArea = document.getElementById('passageSelectionArea');
-        const passageCountElement = document.getElementById('passageCount');
-        const selectAllCheckbox = document.getElementById('selectAllPassages');
-        
-        const modeSelectionArea = document.getElementById('modeSelectionArea');
-        const simpleTranslationOptions = document.getElementById('simpleTranslationOptions');
-        const generationModeRadios = document.querySelectorAll('input[name="generationMode"]');
-        
-        const generateButton = document.getElementById('generateButton');
-        const generateButtonText = document.getElementById('generateButtonText');
-        const actionArea = document.getElementById('actionArea'); 
-        
-        const loader = document.getElementById('loader');
-        const statusMessage = document.getElementById('statusMessage');
+// UI 요소 참조
+const fileInput = document.getElementById('fileInput');
+const uploadTriggerButton = document.getElementById('uploadTriggerButton');
+const uploadButton = document.getElementById('uploadButton');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const dropZone = document.getElementById('dropZone');
 
-        let passageObjects = []; 
-        const rainbowColors = ["C75252", "315F97", "E9AE2B", "699B37", "358791", "D356A7", "8A4E9E", "4A4A4A", "D07C3E", "00796B"];
-        const cmToTwip = (cm) => Math.round(cm * 566.929);
+const passageDisplay = document.getElementById('passageDisplay');
+const passageSelectionArea = document.getElementById('passageSelectionArea');
+const passageCountElement = document.getElementById('passageCount');
+const selectAllCheckbox = document.getElementById('selectAllPassages');
 
-        // --- 이벤트 리스너 설정 ---
+const modeSelectionArea = document.getElementById('modeSelectionArea');
+const simpleTranslationOptions = document.getElementById('simpleTranslationOptions');
+const generationModeRadios = document.querySelectorAll('input[name="generationMode"]');
 
-        if (dropZone) {
-            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-            dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('dragover');
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    fileInput.files = files;
-                    updateStatus(`선택된 파일: ${files[0].name}. '지문 분석 시작' 버튼을 클릭하세요.`, "info");
-                }
-            });
+const generateButton = document.getElementById('generateButton');
+const generateButtonText = document.getElementById('generateButtonText');
+const actionArea = document.getElementById('actionArea');
+
+const loader = document.getElementById('loader');
+const statusMessage = document.getElementById('statusMessage');
+
+let passageObjects = [];
+const rainbowColors = ["C75252", "315F97", "E9AE2B", "699B37", "358791", "D356A7", "8A4E9E", "4A4A4A", "D07C3E", "00796B"];
+const cmToTwip = (cm) => Math.round(cm * 566.929);
+
+// --- 이벤트 리스너 설정 ---
+
+if (dropZone) {
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            updateStatus(`선택된 파일: ${files[0].name}. '지문 분석 시작' 버튼을 클릭하세요.`, "info");
+        }
+    });
+}
+
+if (uploadTriggerButton) uploadTriggerButton.addEventListener('click', () => fileInput.click());
+if (fileInput) fileInput.addEventListener('change', () => {
+    if (fileInput.files && fileInput.files.length > 0) {
+        updateStatus(`선택된 파일: ${fileInput.files[0].name}. '지문 분석 시작' 버튼을 클릭하세요.`, "info");
+    }
+});
+
+generationModeRadios.forEach(radio => {
+    radio.addEventListener('change', (event) => {
+        if (event.target.value === 'simple_translation') {
+            simpleTranslationOptions.classList.remove('hidden');
+            generateButtonText.textContent = "한 줄 해석 생성 (DOCX)";
+        } else {
+            simpleTranslationOptions.classList.add('hidden');
+            generateButtonText.textContent = "수업노트 생성 (DOCX)";
+        }
+    });
+});
+
+if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', (event) => {
+        const isChecked = event.target.checked;
+        passageObjects.forEach(p => p.selected = isChecked);
+        const checkboxes = passageDisplay.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => cb.checked = isChecked);
+        updatePassageCount();
+    });
+}
+
+if (uploadButton) {
+    uploadButton.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        if (!file) {
+            updateStatus("먼저 파일을 선택해주세요.", "error");
+            return;
+        }
+        if (!apiKeyInput.value.trim()) {
+            updateStatus("Gemini API 키를 입력해주세요.", "error");
+            apiKeyInput.focus();
+            return;
         }
 
-        if (uploadTriggerButton) uploadTriggerButton.addEventListener('click', () => fileInput.click());
-        if (fileInput) fileInput.addEventListener('change', () => {
-            if (fileInput.files && fileInput.files.length > 0) {
-                updateStatus(`선택된 파일: ${fileInput.files[0].name}. '지문 분석 시작' 버튼을 클릭하세요.`, "info");
+        updateStatus("파일을 읽고 지문을 분리하는 중...", "loading");
+        try {
+            let rawText = "";
+            if (file.name.endsWith('.txt')) {
+                rawText = await file.text();
+            } else if (file.name.endsWith('.docx')) {
+                const arrayBuffer = await file.arrayBuffer();
+                const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                rawText = result.value;
+            } else {
+                updateStatus("지원하지 않는 파일 형식입니다. .txt 또는 .docx 파일을 사용해주세요.", "error");
+                return;
             }
-        });
+            
+            passageObjects = parsePassages(rawText);
 
-        generationModeRadios.forEach(radio => {
-            radio.addEventListener('change', (event) => {
-                if (event.target.value === 'simple_translation') {
-                    simpleTranslationOptions.classList.remove('hidden');
-                    generateButtonText.textContent = "한 줄 해석 생성 (DOCX)";
-                } else {
-                    simpleTranslationOptions.classList.add('hidden');
-                    generateButtonText.textContent = "수업노트 생성 (DOCX)";
-                }
-            });
-        });
-        
-        if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('change', (event) => {
-                const isChecked = event.target.checked;
-                passageObjects.forEach(p => p.selected = isChecked);
-                const checkboxes = passageDisplay.querySelectorAll('input[type="checkbox"]');
-                checkboxes.forEach(cb => cb.checked = isChecked);
-                updatePassageCount();
-            });
+            if (passageObjects.length === 0) {
+                updateStatus("파일에서 지문을 추출하지 못했습니다.", "error");
+                [passageSelectionArea, modeSelectionArea, actionArea].forEach(el => el.classList.add('hidden'));
+                return;
+            }
+
+            displayPassageList();
+            [passageSelectionArea, modeSelectionArea, actionArea].forEach(el => el.classList.remove('hidden'));
+            updateStatus(`${passageObjects.length}개의 지문이 로드되었습니다. 생성할 지문을 선택하고 모드를 결정해주세요.`, "success");
+
+        } catch (error) {
+            console.error("File processing error:", error);
+            updateStatus(`파일 처리 중 오류 발생: ${error.message}`, "error");
+            [passageSelectionArea, modeSelectionArea, actionArea].forEach(el => el.classList.add('hidden'));
+            passageObjects = [];
         }
-        
-        if (uploadButton) {
-            uploadButton.addEventListener('click', async () => {
-                const file = fileInput.files[0];
-                if (!file) {
-                    updateStatus("먼저 파일을 선택해주세요.", "error");
-                    return;
-                }
-                if (!apiKeyInput.value.trim()) {
-                    updateStatus("Gemini API 키를 입력해주세요.", "error");
-                    apiKeyInput.focus();
-                    return;
-                }
+    });
+}
 
-                updateStatus("파일을 읽고 지문을 분리하는 중...", "loading");
+if (generateButton) {
+    generateButton.addEventListener('click', async () => {
+        const selectedPassages = passageObjects.filter(p => p.selected);
+        if (selectedPassages.length === 0) {
+            updateStatus("생성할 지문을 선택해주세요.", "error");
+            return;
+        }
+        if (!apiKeyInput.value.trim()) {
+            updateStatus("Gemini API 키를 입력해주세요.", "error");
+            apiKeyInput.focus();
+            return;
+        }
+
+        const selectedMode = document.querySelector('input[name="generationMode"]:checked').value;
+        const startTime = performance.now();
+        
+        if (selectedMode === 'full_note') {
+            updateStatus(`AI가 선택된 ${selectedPassages.length}개 지문에 대한 수업노트 내용을 생성 중입니다...`, "loading");
+            const allPageChildrenForDoc = [];
+            for (let i = 0; i < selectedPassages.length; i++) {
+                const passageObj = selectedPassages[i];
+                updateStatus(`(${i+1}/${selectedPassages.length}) '${passageObj.title.substring(0,20)}...' 분석 중...`, "loading");
                 try {
-                    let rawText = "";
-                    if (file.name.endsWith('.txt')) {
-                        rawText = await file.text();
-                    } else if (file.name.endsWith('.docx')) {
-                        const arrayBuffer = await file.arrayBuffer();
-                        const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
-                        rawText = result.value;
-                    } else {
-                        updateStatus("지원하지 않는 파일 형식입니다. .txt 또는 .docx 파일을 사용해주세요.", "error");
-                        return;
+                    const aiData = await getAIData(passageObj.originalFullText);
+                    if (aiData) {
+                        if (i > 0) allPageChildrenForDoc.push(new Paragraph({ children: [new PageBreak()] }));
+                        allPageChildrenForDoc.push(...createPageContentForDocx(passageObj.body, aiData, passageObj.title));
                     }
-                    
-                    passageObjects = parsePassages(rawText);
-
-                    if (passageObjects.length === 0) {
-                        updateStatus("파일에서 지문을 추출하지 못했습니다.", "error");
-                        [passageSelectionArea, modeSelectionArea, actionArea].forEach(el => el.classList.add('hidden'));
-                        return;
-                    }
-
-                    displayPassageList();
-                    [passageSelectionArea, modeSelectionArea, actionArea].forEach(el => el.classList.remove('hidden'));
-                    updateStatus(`${passageObjects.length}개의 지문이 로드되었습니다. 생성할 지문을 선택하고 모드를 결정해주세요.`, "success");
-
                 } catch (error) {
-                    console.error("File processing error:", error);
-                    updateStatus(`파일 처리 중 오류 발생: ${error.message}`, "error");
-                    [passageSelectionArea, modeSelectionArea, actionArea].forEach(el => el.classList.add('hidden'));
-                    passageObjects = [];
+                     console.error(`Error processing passage "${passageObj.title}":`, error.message);
+                     updateStatus(`'${passageObj.title}' 처리 중 오류 발생. 이 지문을 건너뜁니다.`, "error");
                 }
-            });
-        }
-        
-        if (generateButton) {
-            generateButton.addEventListener('click', async () => {
-                const selectedPassages = passageObjects.filter(p => p.selected);
-                if (selectedPassages.length === 0) {
-                    updateStatus("생성할 지문을 선택해주세요.", "error");
-                    return;
-                }
-                if (!apiKeyInput.value.trim()) {
-                    updateStatus("Gemini API 키를 입력해주세요.", "error");
-                    apiKeyInput.focus();
-                    return;
-                }
-
-                const selectedMode = document.querySelector('input[name="generationMode"]:checked').value;
-                const startTime = performance.now();
-                
-                if (selectedMode === 'full_note') {
-                    // --- 기존 노트 생성 로직 ---
-                    updateStatus(`AI가 선택된 ${selectedPassages.length}개 지문에 대한 수업노트 내용을 생성 중입니다...`, "loading");
-                    const allPageChildrenForDoc = [];
-                    for (let i = 0; i < selectedPassages.length; i++) {
-                        const passageObj = selectedPassages[i];
-                        updateStatus(`(${i+1}/${selectedPassages.length}) '${passageObj.title.substring(0,20)}...' 분석 중...`, "loading");
-                        try {
-                            const aiData = await getAIData(passageObj.originalFullText);
-                            if (aiData) {
-                                if (i > 0) allPageChildrenForDoc.push(new Paragraph({ children: [new PageBreak()] }));
-                                allPageChildrenForDoc.push(...createPageContentForDocx(passageObj.body, aiData, passageObj.title));
-                            }
-                        } catch (error) {
-                             console.error(`Error processing passage "${passageObj.title}":`, error.message);
-                             updateStatus(`'${passageObj.title}' 처리 중 오류 발생. 이 지문을 건너뜁니다.`, "error");
-                        }
-                    }
-                    if (allPageChildrenForDoc.length > 0) {
-                        updateStatus("DOCX 파일 생성 중...", "loading");
-                        const doc = createFullNoteDoc(allPageChildrenForDoc);
-                        downloadDocx(doc, "수업노트", selectedPassages, startTime);
-                    } else {
-                        updateStatus("생성할 내용이 없습니다. AI 분석에 실패했을 수 있습니다.", "error");
-                    }
+            }
+            if (allPageChildrenForDoc.length > 0) {
+                updateStatus("DOCX 파일 생성 중...", "loading");
+                const doc = createFullNoteDoc(allPageChildrenForDoc);
+                downloadDocx(doc, "수업노트", selectedPassages, startTime);
+            } else {
+                updateStatus("생성할 내용이 없습니다. AI 분석에 실패했을 수 있습니다.", "error");
+            }
+        } else {
+            updateStatus(`AI가 선택된 ${selectedPassages.length}개 지문에 대한 한 줄 해석을 생성 중입니다...`, "loading");
+            const fullTextToTranslate = selectedPassages.map(p => p.originalFullText).join("\n\n");
+            try {
+                const translatedSentences = await getSentenceTranslations(fullTextToTranslate);
+                if (translatedSentences && translatedSentences.length > 0) {
+                    updateStatus("DOCX 파일 생성 중...", "loading");
+                    const simpleDoc = createSimpleTranslationDocx(translatedSentences);
+                    downloadDocx(simpleDoc, "한줄해석", selectedPassages, startTime);
                 } else {
-                    // --- 새로운 한 줄 해석 로직 ---
-                    updateStatus(`AI가 선택된 ${selectedPassages.length}개 지문에 대한 한 줄 해석을 생성 중입니다...`, "loading");
-                    const fullTextToTranslate = selectedPassages.map(p => p.originalFullText).join("\n\n");
-                    try {
-                        const translatedSentences = await getSentenceTranslations(fullTextToTranslate);
-                        if (translatedSentences && translatedSentences.length > 0) {
-                            updateStatus("DOCX 파일 생성 중...", "loading");
-                            const simpleDoc = createSimpleTranslationDocx(translatedSentences);
-                            downloadDocx(simpleDoc, "한줄해석", selectedPassages, startTime);
-                        } else {
-                            updateStatus("번역된 문장이 없습니다. AI 분석에 실패했을 수 있습니다.", "error");
-                        }
-                    } catch (error) {
-                        console.error(`Error getting simple translation:`, error.message);
-                        updateStatus(`한 줄 해석 생성 중 오류 발생: ${error.message}`, "error");
-                    }
+                    updateStatus("번역된 문장이 없습니다. AI 분석에 실패했을 수 있습니다.", "error");
                 }
-            });
+            } catch (error) {
+                console.error(`Error getting simple translation:`, error.message);
+                updateStatus(`한 줄 해석 생성 중 오류 발생: ${error.message}`, "error");
+            }
         }
-        
-        // --- '한 줄 해석' 모드용 신규 함수들 ---
+    });
+}
 
-        async function getSentenceTranslations(fullText) {
-            const schema = {
-                type: "ARRAY",
-                items: {
-                    type: "OBJECT",
-                    properties: {
-                        type: { type: "STRING", enum: ["title", "sentence", "break"] },
-                        english: { type: "STRING" },
-                        korean: { type: "STRING" }
-                    },
-                    required: ["type", "english"]
-                }
-            };
-            const prompt = `Analyze the following English text. Identify titles, individual sentences, and paragraph breaks.
+async function getSentenceTranslations(fullText) {
+    const schema = {
+        type: "ARRAY",
+        items: {
+            type: "OBJECT",
+            properties: {
+                type: { type: "STRING", enum: ["title", "sentence", "break"] },
+                english: { type: "STRING" },
+                korean: { type: "STRING" }
+            },
+            required: ["type", "english"]
+        }
+    };
+    const prompt = `Analyze the following English text. Identify titles, individual sentences, and paragraph breaks.
 - If a line is a title or subtitle, set 'type' to 'title', 'english' to the title text, and 'korean' to an empty string.
 - If a line is a grammatical sentence, set 'type' to 'sentence', 'english' to the original English sentence, and 'korean' to its natural Korean translation.
 - If there is an empty line indicating a paragraph break, represent it as an object with 'type': 'break' and 'english': "".
@@ -340,274 +335,485 @@ Return the result as a JSON array of objects based on the schema.
 
 Text:
 "${fullText}"`;
-            return await callGeminiAPI(prompt, schema);
+    return await callGeminiAPI(prompt, schema);
+}
+
+function createSimpleTranslationDocx(sentences) {
+    const format = document.querySelector('input[name="simpleModeFormat"]:checked').value;
+    const doc = new Document({
+        styles: {
+            default: {
+                paragraph: { run: { font: "맑은 고딕", size: 22 }, spacing: { line: 1.5, after: 0 } }
+            }
+        },
+        sections: [{ properties: { page: { margin: { top: Inches(1), bottom: Inches(1), left: Inches(1), right: Inches(1) } } } }]
+    });
+    
+    doc.addParagraph("한 줄 해석 변환 결과", "Title");
+
+    let sentenceCounter = 1;
+    sentences.forEach(item => {
+        if (item.type === 'title') {
+            doc.addParagraph(item.english, 'Heading3');
+        } else if (item.type === 'sentence') {
+            const p = doc.addParagraph();
+            const numberedEnglish = `${String(sentenceCounter).padStart(2, '0')}. ${item.english}`;
+            const translatedKorean = item.korean || "";
+
+            if (format === 'eng_kor') {
+                p.addRun(numberedEnglish).bold = true;
+                if (translatedKorean) p.addRun(`\n➡️ ${translatedKorean}`);
+            } else if (format === 'eng_only') {
+                p.addRun(numberedEnglish).bold = true;
+            } else if (format === 'kor_only' && translatedKorean) {
+                p.addRun(`${String(sentenceCounter).padStart(2, '0')}. ${translatedKorean}`);
+            }
+            sentenceCounter++;
+        } else if (item.type === 'break') {
+            doc.addParagraph("");
         }
+    });
+    return doc;
+}
 
-        function createSimpleTranslationDocx(sentences) {
-            const format = document.querySelector('input[name="simpleModeFormat"]:checked').value;
-            const doc = new Document({
-                styles: {
-                    default: {
-                        paragraph: { run: { font: "맑은 고딕", size: 22 }, spacing: { line: 1.5, after: 0 } }
-                    }
-                },
-                sections: [{ properties: { page: { margin: { top: Inches(1), bottom: Inches(1), left: Inches(1), right: Inches(1) } } } }]
-            });
-            
-            doc.addParagraph("한 줄 해석 변환 결과", "Title");
-
-            let sentenceCounter = 1;
-            sentences.forEach(item => {
-                if (item.type === 'title') {
-                    doc.addParagraph(item.english, 'Heading3');
-                } else if (item.type === 'sentence') {
-                    const p = doc.addParagraph();
-                    const numberedEnglish = `${String(sentenceCounter).padStart(2, '0')}. ${item.english}`;
-                    const translatedKorean = item.korean || "";
-
-                    if (format === 'eng_kor') {
-                        p.addRun(numberedEnglish).bold = true;
-                        if (translatedKorean) p.addRun(`\n➡️ ${translatedKorean}`);
-                    } else if (format === 'eng_only') {
-                        p.addRun(numberedEnglish).bold = true;
-                    } else if (format === 'kor_only' && translatedKorean) {
-                        p.addRun(`${String(sentenceCounter).padStart(2, '0')}. ${translatedKorean}`);
-                    }
-                    sentenceCounter++;
-                } else if (item.type === 'break') {
-                    doc.addParagraph("");
+async function getAIData(fullPassageForAI) {
+    const schema = {
+        type: "OBJECT",
+        properties: {
+            keywords: {
+                type: "ARRAY",
+                items: {
+                    type: "OBJECT",
+                    properties: { english: { "type": "STRING" }, korean: { "type": "STRING" } },
+                    required: ["english", "korean"]
                 }
-            });
-            return doc;
-        }
-
-        // --- 기존 함수들 (일부 수정됨) ---
-        
-        async function getAIData(fullPassageForAI) {
-            const schema = { /* ... (Schema from previous versions) ... */ };
-            const prompt = `You are an expert English teacher AI assistant... 
-            IMPORTANT INSTRUCTION FOR 'keywords':
-            From ONLY THE MAIN BODY, select about 15 **core keywords**...
-            ... (Rest of the detailed prompt from previous versions) ...
-            Passage: "${fullPassageForAI}"`;
-            return await callGeminiAPI(prompt, schema);
-        }
-        
-        function createPageContentForDocx(passageBody, aiData, docTitle) {
-            const fontEnglish = "서울남산체 M"; 
-            const fontKorean = "김남윤체";
-            const finalKeywordDetails = aiData.keywords ? aiData.keywords.slice(0, 20) : []; 
-            // ... (The rest of the complex table and layout generation logic)
-            // This is a very long function, here's a simplified representation
-            const englishPassageParas = [ /* ... creates highlighted english text ... */ ];
-            const notesSectionParas = [ /* ... creates note taking space ... */ ];
-            const englishAndNotesTable = new Table({ /* ... combines them ... */ });
-            const remainingLeftChildren = [ /* ... 의역, 주제, 키워드 ... */ ];
-            const remainingRightChildren = [ /* ... 확인 문제 ... */ ];
-            const lowerContentTable = new Table({ /* ... combines them ... */ });
-            return [englishAndNotesTable, lowerContentTable];
-        }
-        
-        function createFullNoteDoc(children) {
-            const fontEnglish = "서울남산체 M"; 
-            const fontKorean = "김남윤체";
-            const lineSpacingValue = 276;
-            return new Document({
-                creator: "OPD Note Generator",
-                styles: { 
-                    default: {
-                        paragraph: { spacing: { line: lineSpacingValue, lineRule: LineRuleType.AUTO } },
-                        document: { run: { size: 20, font: fontEnglish, color: "000000" } }, 
+            },
+            free_translation_korean: { type: "STRING" },
+            direct_translation_korean: { type: "STRING" },
+            theme: {
+                type: "OBJECT",
+                properties: { english: { "type": "STRING" }, korean: { "type": "STRING" } },
+                required: ["english", "korean"]
+            },
+            hashtags: { type: "ARRAY", items: { "type": "STRING" } },
+            quiz1: {
+                type: "OBJECT",
+                properties: {
+                    question: { "type": "STRING" },
+                    options: { type: "ARRAY", items: { "type": "STRING" } },
+                    false_statement_index: { "type": "INTEGER" },
+                    explanation: { "type": "STRING" }
+                },
+                required: ["question", "options", "false_statement_index", "explanation"]
+            },
+            quiz2: {
+                type: "OBJECT",
+                properties: {
+                    question_text: { "type": "STRING" },
+                    summary_sentence_template: { type: "STRING" },
+                    blank_options: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: { A: { "type": "STRING" }, B: { "type": "STRING" } },
+                            required: ["A", "B"]
+                        }
                     },
-                    paragraphStyles: [
-                        { id: "englishStyle", name: "English Style", basedOn: "Normal", run: { font: fontEnglish, size: 20, color: "000000" } }, 
-                        { id: "koreanStyle", name: "Korean Style", basedOn: "Normal", run: { font: fontKorean, size: 20, color: "000000" } }, 
-                        { id: "koreanSectionTitleStyle", name: "Korean Section Title Style", basedOn: "Normal", run: { font: fontKorean, size: 22, bold: true, color: "000000" }, paragraph: { spacing: { before: 120, after: 60 } } },
-                        { id: "englishPassageTitleStyle", name: "English Passage Title Style", basedOn: "Normal", run: { font: fontEnglish, size: 22, bold: true, color: "000000", characterSpacing: -14 }, paragraph: { spacing: { after: 100 } } },
-                    ],
+                    correct_pair_index: { "type": "INTEGER" },
+                    explanation: { "type": "STRING" }
                 },
-                sections: [{ properties: { page: { margin: { top: cmToTwip(1.5), right: cmToTwip(1.5), bottom: cmToTwip(1.5), left: cmToTwip(1.5) } } }, children: children }]
-            });
+                required: ["question_text", "summary_sentence_template", "blank_options", "correct_pair_index", "explanation"]
+            }
+        },
+        required: ["keywords", "free_translation_korean", "direct_translation_korean", "theme", "hashtags", "quiz1", "quiz2"]
+    };
+    const prompt = `You are an expert English teacher AI assistant.
+For the following English passage (where the first line or first few lines might be a title/header and the rest is the main body), provide the requested information in JSON format according to the schema.
+CRITICALLY IMPORTANT: The translations (free_translation_korean, direct_translation_korean), theme, keywords, and hashtags should be based ONLY on the MAIN BODY of the passage, EXCLUDING any initial title or header lines.
+
+IMPORTANT INSTRUCTION FOR 'keywords':
+From ONLY THE MAIN BODY, select about 15 **core keywords** that are most critical to understanding the passage's main idea, theme, and logical flow. These should be words or short phrases whose meaning is essential to the overall context, not just common vocabulary.
+
+IMPORTANT INSTRUCTION FOR 'direct_translation_korean':
+This field is for internal keyword consistency and WILL NOT BE DISPLAYED. It MUST be a literal Korean direct translation (직역) of ONLY THE MAIN BODY.
+  - It should primarily be PURE KOREAN TEXT.
+  - **Exception for Proper Nouns/Acronyms:** You MAY use common English proper nouns or acronyms directly within this Korean translation IF they are widely understood as such in Korean.
+  - If an English proper noun/acronym is used here, it MUST also be listed as a keyword where 'keywords.english' and 'keywords.korean' are both that English term.
+  - ABSOLUTELY NO HTML-like tags or markdown are allowed in this field.
+
+IMPORTANT INSTRUCTION FOR 'free_translation_korean':
+This field MUST be a natural Korean free translation (의역) of ONLY THE MAIN BODY.
+
+IMPORTANT INSTRUCTION FOR 'hashtags':
+From your 'keywords' list (derived from THE MAIN BODY), select the 10 MOST IMPORTANT English terms. Convert them to hashtags (e.g., #example).
+
+QUIZZES (Based on THE MAIN BODY):
+- quiz1.question: This field MUST ONLY contain the exact Korean string: '[내용불일치]'
+- quiz1.options: Provide me with 5 answer choices, which start with small letters, using ①,②,③,④,⑤ in numerical order. Each choice should succinctly summarize information from different parts of the passage in a concise manner. Make sure to adhere to proper grammar rules including starting people's names with capital letters. Please include one distractor that subtly deviates from the correct information in the passage, making it slightly incorrect and potentially confusing for students. The distractor should be placed at a random position among the 5 options (①, ②, ③, ④, ⑤) with equal likelihood of it appearing in any position.
+- quiz1.explanation: This explanation MUST be in KOREAN and CONCISELY detail *why* the chosen false statement (the distractor) is false according to THE MAIN BODY. After providing the answer choices, please identify the distractor and explain why it is the distractor. Focus on the absolute core reasoning.
+- quiz2.question_text: This field MUST ONLY contain the exact Korean string: '[요약]'
+- quiz2.summary_sentence_template: CRITICAL INSTRUCTION: Generate a summary of the given passage with two blanks (A) and (B), ensuring the summary accurately represents the main points and is **WRITTEN EXCLUSIVELY AND STRICTLY IN ENGLISH. IT MUST NOT CONTAIN ANY KOREAN CHARACTERS OR KOREAN TEXT WHATSOEVER, UNDER ANY CIRCUMSTANCES.** The (A) should be derived from the first half and (B) from the second half of the summary if possible. The chosen keywords for (A) and (B) should centralize the text's message. (A) and (B) should keep a distance enough so that they aren't aligned very close each other.
+- quiz2.blank_options: Provide five options with one correct choice and the rest being distractors. The options may have (A) correct but (B) wrong, or vice versa, or both incorrect. Each option should consist of only one word, laid out with (A) and (B) as shown in the schema.
+- quiz2.explanation: This explanation MUST be in KOREAN and CONCISELY detail *why* the chosen pair of words for (A) and (B) correctly completes the English summary sentence by referencing how they reflect THE MAIN BODY's core message. Provide the correct option and the reasoning for it. Focus on the absolute core reasoning.
+
+All other Korean text (theme.korean) must be natural and grammatically correct Korean, based on THE MAIN BODY.
+
+Passage:
+"${fullPassageForAI}"
+
+Provide JSON output only.`;
+    return await callGeminiAPI(prompt, schema);
+}
+
+function createPageContentForDocx(passageBody, aiData, docTitle) {
+    const fontEnglish = "서울남산체 M"; 
+    const fontKorean = "김남윤체";
+    const lineSpacing = 276;
+    const finalKeywordDetails = aiData.keywords ? aiData.keywords.slice(0, 20) : []; 
+    const titleFontSize = 22; 
+    const bodyFontSize = 20;  
+    const quiz1OptionFontSize = 18; 
+    const quiz2SummarSentenceFontSize = 18; 
+    const quiz2OptionFontSize = 18; 
+    const quizAnswerKoreanFontSize = 18; 
+    const quizLineSpacing = Math.round(240 * 0.9); 
+    const quizNumbering = ['①', '②', '③', '④', '⑤']; 
+    const pageWidthInTwips = convertInchesToTwip(8.27); 
+    const pageMarginInTwips = cmToTwip(1.5); 
+    const availableTableWidth = pageWidthInTwips - (2 * pageMarginInTwips);
+    const halfAvailableWidth = Math.floor(availableTableWidth / 2);
+    const emptyParagraph = new Paragraph({ text: "", spacing: { line: lineSpacing, lineRule: LineRuleType.AUTO }});
+    
+    const englishPassageParas = [
+        new Paragraph({ 
+            children: [new TextRun({ text: docTitle, font: fontEnglish, size: titleFontSize, bold: true, characterSpacing: -14 })], 
+            style: "englishPassageTitleStyle"
+        }),
+        new Paragraph({ 
+            children: createHighlightedTextRuns(passageBody, finalKeywordDetails, fontEnglish, fontEnglish, fontKorean, true),
+            style: "englishStyle"
+        }),
+    ];
+
+    const notesSectionParas = [ 
+        new Paragraph({ 
+            children: [new TextRun({ text: "▶ 필기", font: fontKorean, size: titleFontSize, bold: true })],  
+            style: "koreanSectionTitleStyle", 
+        }),
+        ...Array(10).fill(null).map(() => new Paragraph({ text: "", style: "koreanStyle" }))
+    ];
+    
+    const englishAndNotesTable = new Table({ 
+        rows: [ new TableRow({ children: [
+            new TableCell({ children: englishPassageParas, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.SINGLE, size: 6, color: "D3D3D3" } }, margins: { right: cmToTwip(0.1) } }),
+            new TableCell({ children: notesSectionParas, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, margins: { left: cmToTwip(0.1) } })
+        ] }) ],
+        width: { size: availableTableWidth, type: WidthType.DXA },
+    });
+
+    const remainingLeftChildren = [
+        emptyParagraph, 
+        new Paragraph({ children: [new TextRun({ text: "▼ 의역", font: fontKorean, size: titleFontSize, bold: true })], style: "koreanSectionTitleStyle"}),
+        new Paragraph({ text: aiData.free_translation_korean, style: "koreanStyle"}),
+        emptyParagraph, 
+        new Paragraph({ children: [new TextRun({ text: "▲ 주제", font: fontKorean, size: titleFontSize, bold: true })], style: "koreanSectionTitleStyle"}),
+        new Paragraph({ children: [new TextRun({ text: aiData.theme.english, font: fontEnglish, size: bodyFontSize })], style: "englishStyle"}),
+        new Paragraph({ children: [new TextRun({ text: aiData.theme.korean, font: fontKorean, size: bodyFontSize })], style: "koreanStyle"}),
+        emptyParagraph, 
+        new Paragraph({ children: [new TextRun({ text: "▽ 핵심 키워드", font: fontKorean, size: titleFontSize, bold: true })], style: "koreanSectionTitleStyle"}),
+        new Paragraph({ children: [new TextRun({ text: (aiData.hashtags || []).join("  "), font: fontEnglish, size: bodyFontSize })], style: "englishStyle"}),
+    ];
+
+    const remainingRightChildren = [
+        emptyParagraph,
+        new Paragraph({ children: [new TextRun({ text: "▽ 확인 문제", font: fontKorean, size: titleFontSize, bold: true })], style: "koreanSectionTitleStyle"}),
+        new Paragraph({ children: [new TextRun({ text: `1. ${aiData.quiz1.question || '[내용불일치]'}`, font: fontKorean, size: bodyFontSize, bold:true })], style: "koreanStyle" }),
+        ...(aiData.quiz1.options || []).map((opt, index) => new Paragraph({ children: [ new TextRun({text: `   ${opt}`, font: fontEnglish, size: quiz1OptionFontSize}), index === aiData.quiz1.false_statement_index ? new TextRun({text: " (정답)", font: fontKorean, size: quiz1OptionFontSize, color: "FF0000", italics: true}) : new TextRun({text:""}) ], style: "englishStyle" })),
+        new Paragraph({ children: [ new TextRun({text: "   해설: ", font: fontKorean, size: bodyFontSize, bold: true, italics: true}), new TextRun({text: aiData.quiz1.explanation || "", font: fontKorean, size: bodyFontSize, italics: true}) ], style: "koreanStyle" }),
+        new Paragraph({ children: [new TextRun({ text: `2. ${aiData.quiz2.question_text || '[요약]'}`, font: fontKorean, size: bodyFontSize, bold:true })], style: "koreanStyle" }),
+        new Paragraph({ children: [ new TextRun({ text: `   "${aiData.quiz2.summary_sentence_template || "Summary is missing."}"`, font: fontEnglish, size: quiz2SummarSentenceFontSize }) ], style: "englishStyle" }),
+        ...(aiData.quiz2.blank_options || []).map((pair, index) => new Paragraph({ children: [ new TextRun({ text: `   ${quizNumbering[index] || (index+1)+'.'} (A) ${pair.A || "N/A"} - (B) ${pair.B || "N/A"}`, font: fontEnglish, size: quiz2OptionFontSize }), index === aiData.quiz2.correct_pair_index ? new TextRun({ text: " (정답)", font: fontKorean, size: quizAnswerKoreanFontSize, color: "008000", italics: true }) : new TextRun({text:""}) ], style: "englishStyle" })),
+        new Paragraph({ children: [ new TextRun({text: "   해설: ", font: fontKorean, size: bodyFontSize, bold: true, italics: true}), new TextRun({text: aiData.quiz2.explanation || "", font: fontKorean, size: bodyFontSize, italics: true}) ], style: "koreanStyle" })
+    ];
+
+    const lowerContentTable = new Table({
+        rows: [ new TableRow({ children: [
+            new TableCell({ children: remainingLeftChildren, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.SINGLE, size: 6, color: "D3D3D3" } }, margins: { right: cmToTwip(0.1) } }),
+            new TableCell({ children: remainingRightChildren, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, margins: { left: cmToTwip(0.1) } })
+        ] }) ],
+        width: { size: availableTableWidth, type: WidthType.DXA },
+        margins: { bottom: cmToTwip(0.5) }
+    });
+    
+    return [englishAndNotesTable, lowerContentTable]; 
+}
+
+function createFullNoteDoc(children) {
+    const fontEnglish = "서울남산체 M"; 
+    const fontKorean = "김남윤체";
+    const lineSpacingValue = 276;
+    return new Document({
+        creator: "OPD Note Generator",
+        styles: { 
+            default: {
+                paragraph: { spacing: { line: lineSpacingValue, lineRule: LineRuleType.AUTO } },
+                document: { run: { size: 20, font: fontEnglish, color: "000000" } }, 
+            },
+            paragraphStyles: [
+                { id: "englishStyle", name: "English Style", basedOn: "Normal", run: { font: fontEnglish, size: 20, color: "000000" } }, 
+                { id: "koreanStyle", name: "Korean Style", basedOn: "Normal", run: { font: fontKorean, size: 20, color: "000000" } }, 
+                { id: "koreanSectionTitleStyle", name: "Korean Section Title Style", basedOn: "Normal", run: { font: fontKorean, size: 22, bold: true, color: "000000" }, paragraph: { spacing: { before: 120, after: 60 } } },
+                { id: "englishPassageTitleStyle", name: "English Passage Title Style", basedOn: "Normal", run: { font: fontEnglish, size: 22, bold: true, color: "000000", characterSpacing: -14 }, paragraph: { spacing: { after: 100 } } },
+            ],
+        },
+        sections: [{ properties: { page: { margin: { top: cmToTwip(1.5), right: cmToTwip(1.5), bottom: cmToTwip(1.5), left: cmToTwip(1.5) } } }, children: children }]
+    });
+}
+
+async function callGeminiAPI(prompt, schema) {
+    const userApiKey = apiKeyInput.value.trim();
+    const payload = {
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json", responseSchema: schema }
+    };
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${userApiKey}`;
+    
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`AI API request failed: ${errorBody}`);
+    }
+    const result = await response.json();
+    if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0].text) {
+        return JSON.parse(result.candidates[0].content.parts[0].text);
+    }
+    throw new Error("AI response was empty or invalid.");
+}
+
+function downloadDocx(doc, baseName, passages, startTime){
+    Packer.toBlob(doc).then(blob => {
+        const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        const firstTitle = passages.length > 0 ? passages[0].title : "결과물";
+        const fileName = passages.length > 1 ? `${baseName}_선택된_지문들.docx` : `${baseName}_${firstTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '_').replace(/\s+/g, '_')}.docx`;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        updateStatus(`DOCX 파일이 성공적으로 생성되었습니다. (소요 시간: ${duration}초)`, "success");
+    }).catch(err => {
+        console.error("Error packing DOCX:", err);
+        updateStatus("DOCX 파일 생성 중 오류 발생.", "error");
+    });
+}
+
+function updateStatus(message, type = "info") { 
+    statusMessage.textContent = message;
+    if (type === "loading") {
+        loader.classList.remove('hidden');
+        statusMessage.className = 'text-blue-600 font-semibold'; 
+    } else {
+        loader.classList.add('hidden');
+        if (type === "success") statusMessage.className = 'text-green-600 font-semibold';
+        else if (type === "error") statusMessage.className = 'text-red-600 font-semibold';
+        else statusMessage.className = 'text-[#0d141c]'; 
+    }
+}
+
+function createHighlightedTextRuns(text, keywordDetails, baseFont, highlightFontForEnglish, highlightFontForKorean, isEnglishPassage) {
+    const runs = [];
+    let lastIndex = 0;
+    const bodyFontSize = 20; 
+
+    if (!text || text.trim() === "") { 
+        return [new TextRun({ text: "", font: baseFont, size: bodyFontSize, color: "000000" })]; 
+    }
+    const validKeywordDetails = (Array.isArray(keywordDetails) ? keywordDetails : []).filter(kd => 
+        kd && kd.english && typeof kd.english === 'string' && kd.english.trim() !== "" && kd.korean && typeof kd.korean === 'string' && kd.korean.trim() !== ""
+    );
+
+    if (validKeywordDetails.length === 0) {
+        return [new TextRun({ text: text, font: baseFont, size: bodyFontSize, color: "000000" })]; 
+    }
+
+    const englishKeywordColorMap = new Map();
+    validKeywordDetails.slice(0, 20).forEach((kd, i) => { 
+        englishKeywordColorMap.set(kd.english.toLowerCase(), rainbowColors[i % rainbowColors.length]);
+    });
+
+    let searchTerms = [];
+    if (isEnglishPassage) { 
+        validKeywordDetails.forEach(kd => {
+            const color = englishKeywordColorMap.get(kd.english.toLowerCase());
+            if (color) searchTerms.push({ text: kd.english, color: color, font: highlightFontForEnglish });
+        });
+    } else { 
+        validKeywordDetails.forEach(kd => {
+            const color = englishKeywordColorMap.get(kd.english.toLowerCase()); 
+            if (color) searchTerms.push({ text: kd.korean, color: color, font: highlightFontForKorean });
+        });
+    }
+    
+    searchTerms.sort((a, b) => b.text.length - a.text.length);
+
+    if (searchTerms.length === 0) {
+        return [new TextRun({ text: text, font: baseFont, size: bodyFontSize, color: "000000" })]; 
+    }
+    
+    const regexFlags = isEnglishPassage ? 'gi' : 'g'; 
+    const keywordRegex = new RegExp(`(${searchTerms.map(st => st.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, regexFlags);
+    
+    const allMatches = [];
+    let match;
+    while ((match = keywordRegex.exec(text)) !== null) {
+        const matchedObject = searchTerms.find(st => isEnglishPassage ? st.text.toLowerCase() === match[0].toLowerCase() : st.text === match[0]);
+        if (matchedObject) {
+            allMatches.push({ index: match.index, matchedText: match[0], termObject: matchedObject });
         }
-        
-        async function callGeminiAPI(prompt, schema) {
-            const userApiKey = apiKeyInput.value.trim();
-            const payload = {
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: { responseMimeType: "application/json", responseSchema: schema }
-            };
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${userApiKey}`;
-            
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+    }
+    allMatches.sort((a, b) => a.index - b.index); 
 
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`AI API request failed: ${errorBody}`);
-            }
-            const result = await response.json();
-            if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0].text) {
-                return JSON.parse(result.candidates[0].content.parts[0].text);
-            }
-            throw new Error("AI response was empty or invalid.");
+    for (const currentMatch of allMatches) {
+        if (currentMatch.index < lastIndex) continue; 
+        if (currentMatch.index > lastIndex) {
+            runs.push(new TextRun({ text: text.substring(lastIndex, currentMatch.index), font: baseFont, size: bodyFontSize, color: "000000" })); 
         }
-        
-        function downloadDocx(doc, baseName, passages, startTime){
-            Packer.toBlob(doc).then(blob => {
-                const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                const firstTitle = passages.length > 0 ? passages[0].title : "결과물";
-                const fileName = passages.length > 1 ? `${baseName}_선택된_지문들.docx` : `${baseName}_${firstTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '_').replace(/\s+/g, '_')}.docx`;
-                link.download = fileName;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(link.href);
-                updateStatus(`DOCX 파일이 성공적으로 생성되었습니다. (소요 시간: ${duration}초)`, "success");
-            }).catch(err => {
-                console.error("Error packing DOCX:", err);
-                updateStatus("DOCX 파일 생성 중 오류 발생.", "error");
-            });
-        }
-        
-        function updateStatus(message, type = "info") { 
-            statusMessage.textContent = message;
-            if (type === "loading") {
-                loader.classList.remove('hidden');
-                statusMessage.className = 'text-blue-600 font-semibold'; 
-            } else {
-                loader.classList.add('hidden');
-                if (type === "success") statusMessage.className = 'text-green-600 font-semibold';
-                else if (type === "error") statusMessage.className = 'text-red-600 font-semibold';
-                else statusMessage.className = 'text-[#0d141c]'; 
-            }
-        }
+        runs.push(new TextRun({
+            text: currentMatch.matchedText, font: currentMatch.termObject.font, color: currentMatch.termObject.color, size: bodyFontSize, bold: true
+        }));
+        lastIndex = currentMatch.index + currentMatch.matchedText.length;
+    }
 
-        // --- 기존 헬퍼 함수들 ---
+    if (lastIndex < text.length) {
+        runs.push(new TextRun({ text: text.substring(lastIndex), font: baseFont, size: bodyFontSize, color: "000000" })); 
+    }
+    return runs.length > 0 ? runs : [new TextRun({ text: text, font: baseFont, size: bodyFontSize, color: "000000" })]; 
+}
 
-        function parsePassages(rawText) {
-            const passages = [];
-            const lines = rawText.split(/\r?\n/);
+function parsePassages(rawText) {
+    const passages = [];
+    const lines = rawText.split(/\r?\n/);
+    let currentDisplayTitle = null; 
+    let currentRawTitleLines = [];  
+    let currentBodyLines = [];      
+    let contextualTopLevelTitleLine = null;
 
-            let contextualTopLevelTitleLine = null;
-            let contextualMidLevelTitleLine = null;
-            let currentDisplayTitle = null; 
-            let currentRawTitleLines = [];  
-            let currentBodyLines = [];      
-
-            function storeCurrentPassage() {
-                if (currentDisplayTitle || currentBodyLines.length > 0) {
-                    const body = currentBodyLines.join('\n').trim();
-                    const rawTitle = currentRawTitleLines.join('\n').trim();
-                    if (body || (currentDisplayTitle && currentDisplayTitle !== "영어 지문 (제목 자동 감지)")) {
-                         const originalFullText = (rawTitle ? rawTitle + '\n' : '') + body;
-                         passages.push({
-                            title: currentDisplayTitle || "영어 지문 (제목 자동 감지)",
-                            body: body,
-                            originalFullText: originalFullText.trim(),
-                            selected: true
-                        });
-                    }
-                }
-                currentDisplayTitle = null;
-                currentRawTitleLines = [];
-                currentBodyLines = [];
-            }
-            
-            function formatTitle(...parts) {
-                return parts.filter(p => p && String(p).trim()).join(" ");
-            }
-
-            const newTopTitlePattern = /^\s*\[\s*(.+)\s*\]\s*$/;
-            const newMidTitlePattern = /^\s*([^\]]+)\]\s*$/;
-            
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const trimmedLine = line.trim();
-                if (trimmedLine === "" && currentDisplayTitle === null) continue;
-                if (trimmedLine === "" && currentDisplayTitle !== null) { 
-                    currentBodyLines.push(line);
-                    continue;
-                }
-
-                if (newTopTitlePattern.test(trimmedLine) || newMidTitlePattern.test(trimmedLine)) {
-                    storeCurrentPassage();
-                    if (newTopTitlePattern.test(trimmedLine)) {
-                        contextualTopLevelTitleLine = trimmedLine;
-                        contextualMidLevelTitleLine = null;
-                        currentDisplayTitle = trimmedLine;
-                    } else { // newMidTitlePattern
-                        contextualMidLevelTitleLine = trimmedLine;
-                        const midMatch = trimmedLine.match(newMidTitlePattern);
-                        currentDisplayTitle = formatTitle(contextualTopLevelTitleLine, midMatch[1]);
-                    }
-                    currentRawTitleLines = contextualTopLevelTitleLine ? [contextualTopLevelTitleLine, trimmedLine] : [trimmedLine];
-                    currentBodyLines = [];
-                } else { 
-                    if (currentDisplayTitle === null && passages.length === 0 && currentBodyLines.length === 0) {
-                        currentDisplayTitle = "영어 지문 (제목 자동 감지)";
-                        currentRawTitleLines = []; 
-                    }
-                    if (currentDisplayTitle !== null) {
-                         currentBodyLines.push(line);
-                    }
-                }
-            }
-            storeCurrentPassage(); 
-            return passages.filter(p => p.body.trim() !== "");
-        }
-
-        function displayPassageList() {
-            passageDisplay.innerHTML = ""; 
-            if (passageObjects.length === 0) {
-                passageDisplay.innerHTML = '<p class="text-slate-500">표시할 지문이 없습니다.</p>';
-                passageCountElement.textContent = "";
-                if(selectAllCheckbox) selectAllCheckbox.checked = false;
-                return;
-            }
-            passageObjects.forEach((p, index) => {
-                const div = document.createElement('div');
-                div.className = 'passage-item p-3 bg-white hover:bg-slate-50 rounded-md shadow-sm'; 
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.id = `passage-${index}`;
-                checkbox.checked = p.selected;
-                checkbox.dataset.index = index;
-                checkbox.className = 'form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500'; 
-                checkbox.addEventListener('change', (event) => {
-                    passageObjects[event.target.dataset.index].selected = event.target.checked;
-                    updateSelectAllCheckboxState();
+    function storeCurrentPassage() {
+        if (currentDisplayTitle || currentBodyLines.length > 0) {
+            const body = currentBodyLines.join('\n').trim();
+            const rawTitle = currentRawTitleLines.join('\n').trim();
+            if (body || (currentDisplayTitle && currentDisplayTitle !== "영어 지문 (제목 자동 감지)")) {
+                 const originalFullText = (rawTitle ? rawTitle + '\n' : '') + body;
+                 passages.push({
+                    title: currentDisplayTitle || "영어 지문 (제목 자동 감지)",
+                    body: body,
+                    originalFullText: originalFullText.trim(),
+                    selected: true
                 });
-                const label = document.createElement('label');
-                label.htmlFor = `passage-${index}`;
-                label.className = 'ml-3 block text-sm font-medium text-gray-700 flex-grow'; 
-                label.innerHTML = `<span class="font-semibold text-gray-900">${p.title}</span><br><span class="text-xs text-gray-500">${p.body.substring(0, 100)}...</span>`; 
-                div.appendChild(checkbox);
-                div.appendChild(label);
-                passageDisplay.appendChild(div);
-            });
-            updatePassageCount(); 
-            updateSelectAllCheckboxState();
-        }
-        
-        function updateSelectAllCheckboxState() {
-            if (!selectAllCheckbox) return;
-            const allSelected = passageObjects.length > 0 && passageObjects.every(p => p.selected);
-            const someSelected = passageObjects.some(p => p.selected);
-            selectAllCheckbox.checked = allSelected;
-            selectAllCheckbox.indeterminate = !allSelected && someSelected; 
-            updatePassageCount();
-        }
-        
-        function updatePassageCount() {
-            if (passageCountElement) {
-                 passageCountElement.textContent = `총 ${passageObjects.length}개의 지문 중 ${passageObjects.filter(p => p.selected).length}개 선택됨.`;
             }
         }
+        currentDisplayTitle = null;
+        currentRawTitleLines = [];
+        currentBodyLines = [];
+    }
+    
+    function formatTitle(...parts) {
+        return parts.filter(p => p && String(p).trim()).join(" ");
+    }
+
+    const newTopTitlePattern = /^\s*\[\s*(.+)\s*\]\s*$/;
+    const newMidTitlePattern = /^\s*([^\]]+)\]\s*$/;
+    
+    for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === "") {
+            if (currentDisplayTitle !== null) currentBodyLines.push(line);
+            continue;
+        }
+
+        let isTitle = false;
+        if (newTopTitlePattern.test(trimmedLine)) {
+            storeCurrentPassage();
+            contextualTopLevelTitleLine = trimmedLine;
+            currentDisplayTitle = trimmedLine;
+            currentRawTitleLines = [trimmedLine];
+            isTitle = true;
+        } else if (newMidTitlePattern.test(trimmedLine)) {
+            storeCurrentPassage();
+            const match = trimmedLine.match(newMidTitlePattern);
+            currentDisplayTitle = formatTitle(contextualTopLevelTitleLine, match[1]);
+            currentRawTitleLines = contextualTopLevelTitleLine ? [contextualTopLevelTitleLine, trimmedLine] : [trimmedLine];
+            isTitle = true;
+        }
+        
+        if (isTitle) {
+            currentBodyLines = [];
+        } else {
+            if (currentDisplayTitle === null) {
+                storeCurrentPassage();
+                currentDisplayTitle = "영어 지문 (제목 자동 감지)";
+            }
+            currentBodyLines.push(line);
+        }
+    }
+    storeCurrentPassage(); 
+    return passages.filter(p => p.body.trim() !== "");
+}
+
+function displayPassageList() {
+    passageDisplay.innerHTML = ""; 
+    if (passageObjects.length === 0) {
+        passageDisplay.innerHTML = '<p class="text-slate-500">표시할 지문이 없습니다.</p>';
+        passageCountElement.textContent = "";
+        if(selectAllCheckbox) selectAllCheckbox.checked = false;
+        return;
+    }
+    passageObjects.forEach((p, index) => {
+        const div = document.createElement('div');
+        div.className = 'passage-item p-3 bg-white hover:bg-slate-50 rounded-md shadow-sm'; 
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `passage-${index}`;
+        checkbox.checked = p.selected;
+        checkbox.dataset.index = index;
+        checkbox.className = 'form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500'; 
+        checkbox.addEventListener('change', (event) => {
+            passageObjects[event.target.dataset.index].selected = event.target.checked;
+            updateSelectAllCheckboxState();
+        });
+        const label = document.createElement('label');
+        label.htmlFor = `passage-${index}`;
+        label.className = 'ml-3 block text-sm font-medium text-gray-700 flex-grow'; 
+        label.innerHTML = `<span class="font-semibold text-gray-900">${p.title}</span><br><span class="text-xs text-gray-500">${p.body.substring(0, 100)}...</span>`; 
+        div.appendChild(checkbox);
+        div.appendChild(label);
+        passageDisplay.appendChild(div);
+    });
+    updatePassageCount(); 
+    updateSelectAllCheckboxState();
+}
+
+function updateSelectAllCheckboxState() {
+    if (!selectAllCheckbox) return;
+    const allSelected = passageObjects.length > 0 && passageObjects.every(p => p.selected);
+    const someSelected = passageObjects.some(p => p.selected);
+    selectAllCheckbox.checked = allSelected;
+    selectAllCheckbox.indeterminate = !allSelected && someSelected; 
+    updatePassageCount();
+}
+
+function updatePassageCount() {
+    if (passageCountElement) {
+         passageCountElement.textContent = `총 ${passageObjects.length}개의 지문 중 ${passageObjects.filter(p => p.selected).length}개 선택됨.`;
+    }
+}
     </script>
 </body>
 </html>
