@@ -22,7 +22,7 @@
         @font-face { font-family: '김남윤체'; }
         .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .passage-item { transition: background-color 0.3s; border-bottom: 1px solid #eee; padding: 8px 4px; margin-bottom: 8px; display: flex; align-items: center; border-radius: 0.5rem; }
+        .passage-item { transition: background-color: 0.3s; border-bottom: 1px solid #eee; padding: 8px 4px; margin-bottom: 8px; display: flex; align-items: center; border-radius: 0.5rem; }
         .passage-item:hover { background-color: #f9fafb; }
         .passage-item:last-child { border-bottom: none; }
         .passage-item input[type="checkbox"] { margin-right: 10px; width: 1.15em; height: 1.15em; border-radius: 0.25rem; border-color: #d1d5db; }
@@ -38,7 +38,7 @@
         #apiKeyInput:focus { outline: 2px solid transparent; outline-offset: 2px; border-color: #3490f3; box-shadow: 0 0 0 2px rgba(52, 144, 243, 0.5); }
         #dropZone.dragover { background-color: #e0f2fe; border-color: #0ea5e9; }
     </style>
-</head>
+    </head>
 <body class="bg-slate-50">
     <div class="relative flex size-full min-h-screen flex-col group/design-root overflow-x-hidden">
       <div class="layout-container flex h-full grow flex-col">
@@ -130,39 +130,30 @@
         </main>
       </div>
     </div>
-
     <script type="module">
-        // 라이브러리 모듈 가져오기
         const { Packer, Document, Paragraph, TextRun, HeadingLevel, PageOrientation, PageBreak, convertInchesToTwip, Table, TableCell, TableRow, WidthType, BorderStyle, VerticalAlign, HeightRule, LineRuleType, AlignmentType } = docx;
 
-        // UI 요소 참조
         const fileInput = document.getElementById('fileInput');
         const uploadTriggerButton = document.getElementById('uploadTriggerButton');
         const uploadButton = document.getElementById('uploadButton');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const dropZone = document.getElementById('dropZone');
-        
         const passageDisplay = document.getElementById('passageDisplay');
         const passageSelectionArea = document.getElementById('passageSelectionArea');
         const passageCountElement = document.getElementById('passageCount');
         const selectAllCheckbox = document.getElementById('selectAllPassages');
-        
         const modeSelectionArea = document.getElementById('modeSelectionArea');
         const simpleTranslationOptions = document.getElementById('simpleTranslationOptions');
         const generationModeRadios = document.querySelectorAll('input[name="generationMode"]');
-        
         const generateButton = document.getElementById('generateButton');
         const generateButtonText = document.getElementById('generateButtonText');
         const actionArea = document.getElementById('actionArea');
-        
         const loader = document.getElementById('loader');
         const statusMessage = document.getElementById('statusMessage');
 
         let passageObjects = [];
         const rainbowColors = ["C75252", "315F97", "E9AE2B", "699B37", "358791", "D356A7", "8A4E9E", "4A4A4A", "D07C3E", "00796B"];
         const cmToTwip = (cm) => Math.round(cm * 566.929);
-
-        // --- 이벤트 리스너 설정 ---
 
         if (dropZone) {
             dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
@@ -315,22 +306,8 @@
                 }
             });
         }
-        
-        // --- '한 줄 해석' 모드용 신규 함수들 ---
-
         async function getSentenceTranslations(fullText) {
-            const schema = {
-                type: "ARRAY",
-                items: {
-                    type: "OBJECT",
-                    properties: {
-                        type: { type: "STRING", enum: ["title", "sentence", "break"] },
-                        english: { type: "STRING" },
-                        korean: { type: "STRING" }
-                    },
-                    required: ["type", "english"]
-                }
-            };
+            const schema = { type: "ARRAY", items: { type: "OBJECT", properties: { type: { type: "STRING", enum: ["title", "sentence", "break"] }, english: { type: "STRING" }, korean: { type: "STRING" } }, required: ["type", "english"] } };
             const prompt = `Analyze the following English text. Identify titles, individual sentences, and paragraph breaks.
 - If a line is a title or subtitle, set 'type' to 'title', 'english' to the title text, and 'korean' to an empty string.
 - If a line is a grammatical sentence, set 'type' to 'sentence', 'english' to the original English sentence, and 'korean' to its natural Korean translation.
@@ -345,11 +322,7 @@ Text:
         function createSimpleTranslationDocx(sentences) {
             const format = document.querySelector('input[name="simpleModeFormat"]:checked').value;
             const doc = new Document({
-                styles: {
-                    default: {
-                        paragraph: { run: { font: "맑은 고딕", size: 22 }, spacing: { line: 1.5, after: 0 } }
-                    }
-                },
+                styles: { default: { paragraph: { run: { font: "맑은 고딕", size: 22 }, spacing: { line: 1.5, after: 0 } } } },
                 sections: [{ properties: { page: { margin: { top: Inches(1), bottom: Inches(1), left: Inches(1), right: Inches(1) } } } }]
             });
             
@@ -379,90 +352,12 @@ Text:
             });
             return doc;
         }
-
-        // --- 기존 함수들 (완전판) ---
         
         async function getAIData(fullPassageForAI) {
-            const schema = {
-                type: "OBJECT",
-                properties: {
-                    keywords: {
-                        type: "ARRAY",
-                        items: {
-                            type: "OBJECT",
-                            properties: { english: { "type": "STRING" }, korean: { "type": "STRING" } },
-                            required: ["english", "korean"]
-                        }
-                    },
-                    free_translation_korean: { type: "STRING" },
-                    direct_translation_korean: { type: "STRING" },
-                    theme: {
-                        type: "OBJECT",
-                        properties: { english: { "type": "STRING" }, korean: { "type": "STRING" } },
-                        required: ["english", "korean"]
-                    },
-                    hashtags: { type: "ARRAY", items: { "type": "STRING" } },
-                    quiz1: {
-                        type: "OBJECT",
-                        properties: {
-                            question: { "type": "STRING" },
-                            options: { type: "ARRAY", items: { "type": "STRING" } },
-                            false_statement_index: { "type": "INTEGER" },
-                            explanation: { "type": "STRING" }
-                        },
-                        required: ["question", "options", "false_statement_index", "explanation"]
-                    },
-                    quiz2: {
-                        type: "OBJECT",
-                        properties: {
-                            question_text: { "type": "STRING" },
-                            summary_sentence_template: { type: "STRING" },
-                            blank_options: {
-                                type: "ARRAY",
-                                items: {
-                                    type: "OBJECT",
-                                    properties: { A: { "type": "STRING" }, B: { "type": "STRING" } },
-                                    required: ["A", "B"]
-                                }
-                            },
-                            correct_pair_index: { "type": "INTEGER" },
-                            explanation: { "type": "STRING" }
-                        },
-                        required: ["question_text", "summary_sentence_template", "blank_options", "correct_pair_index", "explanation"]
-                    }
-                },
-                required: ["keywords", "free_translation_korean", "direct_translation_korean", "theme", "hashtags", "quiz1", "quiz2"]
-            };
-            const prompt = `You are an expert English teacher AI assistant.
-For the following English passage (where the first line or first few lines might be a title/header and the rest is the main body), provide the requested information in JSON format according to the schema.
-CRITICALLY IMPORTANT: The translations (free_translation_korean, direct_translation_korean), theme, keywords, and hashtags should be based ONLY on the MAIN BODY of the passage, EXCLUDING any initial title or header lines.
-IMPORTANT INSTRUCTION FOR 'keywords':
-From ONLY THE MAIN BODY, select about 15 **core keywords** that are most critical to understanding the passage's main idea, theme, and logical flow. These should be words or short phrases whose meaning is essential to the overall context, not just common vocabulary.
-IMPORTANT INSTRUCTION FOR 'direct_translation_korean':
-This field is for internal keyword consistency and WILL NOT BE DISPLAYED. It MUST be a literal Korean direct translation (직역) of ONLY THE MAIN BODY.
-  - It should primarily be PURE KOREAN TEXT.
-  - **Exception for Proper Nouns/Acronyms:** You MAY use common English proper nouns or acronyms directly within this Korean translation IF they are widely understood as such in Korean.
-  - If an English proper noun/acronym is used here, it MUST also be listed as a keyword where 'keywords.english' and 'keywords.korean' are both that English term.
-  - ABSOLUTELY NO HTML-like tags or markdown are allowed in this field.
-IMPORTANT INSTRUCTION FOR 'free_translation_korean':
-This field MUST be a natural Korean free translation (의역) of ONLY THE MAIN BODY.
-IMPORTANT INSTRUCTION FOR 'hashtags':
-From your 'keywords' list (derived from THE MAIN BODY), select the 10 MOST IMPORTANT English terms. Convert them to hashtags (e.g., #example).
-QUIZZES (Based on THE MAIN BODY):
-- quiz1.question: This field MUST ONLY contain the exact Korean string: '[내용불일치]'
-- quiz1.options: Provide me with 5 answer choices, which start with small letters, using ①,②,③,④,⑤ in numerical order. Each choice should succinctly summarize information from different parts of the passage in a concise manner. Make sure to adhere to proper grammar rules including starting people's names with capital letters. Please include one distractor that subtly deviates from the correct information in the passage, making it slightly incorrect and potentially confusing for students. The distractor should be placed at a random position among the 5 options (①, ②, ③, ④, ⑤) with equal likelihood of it appearing in any position.
-- quiz1.explanation: This explanation MUST be in KOREAN and CONCISELY detail *why* the chosen false statement (the distractor) is false according to THE MAIN BODY. After providing the answer choices, please identify the distractor and explain why it is the distractor. Focus on the absolute core reasoning.
-- quiz2.question_text: This field MUST ONLY contain the exact Korean string: '[요약]'
-- quiz2.summary_sentence_template: CRITICAL INSTRUCTION: Generate a summary of the given passage with two blanks (A) and (B), ensuring the summary accurately represents the main points and is **WRITTEN EXCLUSIVELY AND STRICTLY IN ENGLISH. IT MUST NOT CONTAIN ANY KOREAN CHARACTERS OR KOREAN TEXT WHATSOEVER, UNDER ANY CIRCUMSTANCES.** The (A) should be derived from the first half and (B) from the second half of the summary if possible. The chosen keywords for (A) and (B) should centralize the text's message. (A) and (B) should keep a distance enough so that they aren't aligned very close each other.
-- quiz2.blank_options: Provide five options with one correct choice and the rest being distractors. The options may have (A) correct but (B) wrong, or vice versa, or both incorrect. Each option should consist of only one word, laid out with (A) and (B) as shown in the schema.
-- quiz2.explanation: This explanation MUST be in KOREAN and CONCISELY detail *why* the chosen pair of words for (A) and (B) correctly completes the English summary sentence by referencing how they reflect THE MAIN BODY's core message. Provide the correct option and the reasoning for it. Focus on the absolute core reasoning.
-All other Korean text (theme.korean) must be natural and grammatically correct Korean, based on THE MAIN BODY.
-Passage:
-"${fullPassageForAI}"
-Provide JSON output only.`;
+            const schema = { type: "OBJECT", properties: { keywords: { type: "ARRAY", items: { type: "OBJECT", properties: { english: { "type": "STRING" }, korean: { "type": "STRING" } }, required: ["english", "korean"] } }, free_translation_korean: { type: "STRING" }, direct_translation_korean: { type: "STRING" }, theme: { type: "OBJECT", properties: { english: { "type": "STRING" }, korean: { "type": "STRING" } }, required: ["english", "korean"] }, hashtags: { type: "ARRAY", items: { "type": "STRING" } }, quiz1: { type: "OBJECT", properties: { question: { "type": "STRING" }, options: { type: "ARRAY", items: { "type": "STRING" } }, false_statement_index: { "type": "INTEGER" }, explanation: { "type": "STRING" } }, required: ["question", "options", "false_statement_index", "explanation"] }, quiz2: { type: "OBJECT", properties: { question_text: { "type": "STRING" }, summary_sentence_template: { type: "STRING" }, blank_options: { type: "ARRAY", items: { type: "OBJECT", properties: { A: { "type": "STRING" }, B: { "type": "STRING" } }, required: ["A", "B"] } }, correct_pair_index: { "type": "INTEGER" }, explanation: { "type": "STRING" } }, required: ["question_text", "summary_sentence_template", "blank_options", "correct_pair_index", "explanation"] } }, required: ["keywords", "free_translation_korean", "direct_translation_korean", "theme", "hashtags", "quiz1", "quiz2"] };
+            const prompt = `You are an expert English teacher AI assistant. For the following English passage (where the first line or first few lines might be a title/header and the rest is the main body), provide the requested information in JSON format according to the schema. CRITICALLY IMPORTANT: The translations (free_translation_korean, direct_translation_korean), theme, keywords, and hashtags should be based ONLY on the MAIN BODY of the passage, EXCLUDING any initial title or header lines. IMPORTANT INSTRUCTION FOR 'keywords': From ONLY THE MAIN BODY, select about 15 **core keywords** that are most critical to understanding the passage's main idea, theme, and logical flow. These should be words or short phrases whose meaning is essential to the overall context, not just common vocabulary. IMPORTANT INSTRUCTION FOR 'direct_translation_korean': This field is for internal keyword consistency and WILL NOT BE DISPLAYED. It MUST be a literal Korean direct translation (직역) of ONLY THE MAIN BODY. - It should primarily be PURE KOREAN TEXT. - **Exception for Proper Nouns/Acronyms:** You MAY use common English proper nouns or acronyms directly within this Korean translation IF they are widely understood as such in Korean. - If an English proper noun/acronym is used here, it MUST also be listed as a keyword where 'keywords.english' and 'keywords.korean' are both that English term. - ABSOLUTELY NO HTML-like tags or markdown are allowed in this field. IMPORTANT INSTRUCTION FOR 'free_translation_korean': This field MUST be a natural Korean free translation (의역) of ONLY THE MAIN BODY. IMPORTANT INSTRUCTION FOR 'hashtags': From your 'keywords' list (derived from THE MAIN BODY), select the 10 MOST IMPORTANT English terms. Convert them to hashtags (e.g., #example). QUIZZES (Based on THE MAIN BODY): - quiz1.question: This field MUST ONLY contain the exact Korean string: '[내용불일치]' - quiz1.options: Provide me with 5 answer choices, which start with small letters, using ①,②,③,④,⑤ in numerical order. Each choice should succinctly summarize information from different parts of the passage in a concise manner. Make sure to adhere to proper grammar rules including starting people's names with capital letters. Please include one distractor that subtly deviates from the correct information in the passage, making it slightly incorrect and potentially confusing for students. The distractor should be placed at a random position among the 5 options (①, ②, ③, ④, ⑤) with equal likelihood of it appearing in any position. - quiz1.explanation: This explanation MUST be in KOREAN and CONCISELY detail *why* the chosen false statement (the distractor) is false according to THE MAIN BODY. After providing the answer choices, please identify the distractor and explain why it is the distractor. Focus on the absolute core reasoning. - quiz2.question_text: This field MUST ONLY contain the exact Korean string: '[요약]' - quiz2.summary_sentence_template: CRITICAL INSTRUCTION: Generate a summary of the given passage with two blanks (A) and (B), ensuring the summary accurately represents the main points and is **WRITTEN EXCLUSIVELY AND STRICTLY IN ENGLISH. IT MUST NOT CONTAIN ANY KOREAN CHARACTERS OR KOREAN TEXT WHATSOEVER, UNDER ANY CIRCUMSTANCES.** The (A) should be derived from the first half and (B) from the second half of the summary if possible. The chosen keywords for (A) and (B) should centralize the text's message. (A) and (B) should keep a distance enough so that they aren't aligned very close each other. - quiz2.blank_options: Provide five options with one correct choice and the rest being distractors. The options may have (A) correct but (B) wrong, or vice versa, or both incorrect. Each option should consist of only one word, laid out with (A) and (B) as shown in the schema. - quiz2.explanation: This explanation MUST be in KOREAN and CONCISELY detail *why* the chosen pair of words for (A) and (B) correctly completes the English summary sentence by referencing how they reflect THE MAIN BODY's core message. Provide the correct option and the reasoning for it. Focus on the absolute core reasoning. All other Korean text (theme.korean) must be natural and grammatically correct Korean, based on THE MAIN BODY. Passage: "${fullPassageForAI}" Provide JSON output only.`;
             return await callGeminiAPI(prompt, schema);
         }
-        
         function createPageContentForDocx(passageBody, aiData, docTitle) {
             const fontEnglish = "서울남산체 M"; 
             const fontKorean = "김남윤체";
@@ -483,32 +378,17 @@ Provide JSON output only.`;
             const emptyParagraph = new Paragraph({ text: "", spacing: { line: lineSpacing, lineRule: LineRuleType.AUTO }});
             
             const englishPassageParas = [
-                new Paragraph({ 
-                    children: [new TextRun({ text: docTitle, font: fontEnglish, size: titleFontSize, bold: true, characterSpacing: -14 })], 
-                    style: "englishPassageTitleStyle"
-                }),
-                new Paragraph({ 
-                    children: createHighlightedTextRuns(passageBody, finalKeywordDetails, fontEnglish, fontEnglish, fontKorean, true),
-                    style: "englishStyle"
-                }),
+                new Paragraph({ children: [new TextRun({ text: docTitle, font: fontEnglish, size: titleFontSize, bold: true, characterSpacing: -14 })], style: "englishPassageTitleStyle" }),
+                new Paragraph({ children: createHighlightedTextRuns(passageBody, finalKeywordDetails, fontEnglish, fontEnglish, fontKorean, true), style: "englishStyle" }),
             ];
-
             const notesSectionParas = [ 
-                new Paragraph({ 
-                    children: [new TextRun({ text: "▶ 필기", font: fontKorean, size: titleFontSize, bold: true })],  
-                    style: "koreanSectionTitleStyle", 
-                }),
+                new Paragraph({ children: [new TextRun({ text: "▶ 필기", font: fontKorean, size: titleFontSize, bold: true })], style: "koreanSectionTitleStyle" }),
                 ...Array(10).fill(null).map(() => new Paragraph({ text: "", style: "koreanStyle" }))
             ];
-            
-            const englishAndNotesTable = new Table({ 
-                rows: [ new TableRow({ children: [
-                    new TableCell({ children: englishPassageParas, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.SINGLE, size: 6, color: "D3D3D3" } }, margins: { right: cmToTwip(0.1) } }),
-                    new TableCell({ children: notesSectionParas, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, margins: { left: cmToTwip(0.1) } })
-                ] }) ],
-                width: { size: availableTableWidth, type: WidthType.DXA },
-            });
-
+            const englishAndNotesTable = new Table({ rows: [ new TableRow({ children: [
+                new TableCell({ children: englishPassageParas, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.SINGLE, size: 6, color: "D3D3D3" } }, margins: { right: cmToTwip(0.1) } }),
+                new TableCell({ children: notesSectionParas, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, margins: { left: cmToTwip(0.1) } })
+            ] }) ], width: { size: availableTableWidth, type: WidthType.DXA } });
             const remainingLeftChildren = [
                 emptyParagraph, 
                 new Paragraph({ children: [new TextRun({ text: "▼ 의역", font: fontKorean, size: titleFontSize, bold: true })], style: "koreanSectionTitleStyle"}),
@@ -521,7 +401,6 @@ Provide JSON output only.`;
                 new Paragraph({ children: [new TextRun({ text: "▽ 핵심 키워드", font: fontKorean, size: titleFontSize, bold: true })], style: "koreanSectionTitleStyle"}),
                 new Paragraph({ children: [new TextRun({ text: (aiData.hashtags || []).join("  "), font: fontEnglish, size: bodyFontSize })], style: "englishStyle"}),
             ];
-
             const remainingRightChildren = [
                 emptyParagraph,
                 new Paragraph({ children: [new TextRun({ text: "▽ 확인 문제", font: fontKorean, size: titleFontSize, bold: true })], style: "koreanSectionTitleStyle"}),
@@ -533,19 +412,12 @@ Provide JSON output only.`;
                 ...(aiData.quiz2.blank_options || []).map((pair, index) => new Paragraph({ children: [ new TextRun({ text: `   ${quizNumbering[index] || (index+1)+'.'} (A) ${pair.A || "N/A"} - (B) ${pair.B || "N/A"}`, font: fontEnglish, size: quiz2OptionFontSize }), index === aiData.quiz2.correct_pair_index ? new TextRun({ text: " (정답)", font: fontKorean, size: quizAnswerKoreanFontSize, color: "008000", italics: true }) : new TextRun({text:""}) ], style: "englishStyle" })),
                 new Paragraph({ children: [ new TextRun({text: "   해설: ", font: fontKorean, size: bodyFontSize, bold: true, italics: true}), new TextRun({text: aiData.quiz2.explanation || "", font: fontKorean, size: bodyFontSize, italics: true}) ], style: "koreanStyle" })
             ];
-
-            const lowerContentTable = new Table({
-                rows: [ new TableRow({ children: [
-                    new TableCell({ children: remainingLeftChildren, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.SINGLE, size: 6, color: "D3D3D3" } }, margins: { right: cmToTwip(0.1) } }),
-                    new TableCell({ children: remainingRightChildren, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, margins: { left: cmToTwip(0.1) } })
-                ] }) ],
-                width: { size: availableTableWidth, type: WidthType.DXA },
-                margins: { bottom: cmToTwip(0.5) }
-            });
-            
+            const lowerContentTable = new Table({ rows: [ new TableRow({ children: [
+                new TableCell({ children: remainingLeftChildren, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.SINGLE, size: 6, color: "D3D3D3" } }, margins: { right: cmToTwip(0.1) } }),
+                new TableCell({ children: remainingRightChildren, width: { size: halfAvailableWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, margins: { left: cmToTwip(0.1) } })
+            ] }) ], width: { size: availableTableWidth, type: WidthType.DXA }, margins: { bottom: cmToTwip(0.5) } });
             return [englishAndNotesTable, lowerContentTable]; 
         }
-
         function createFullNoteDoc(children) {
             const fontEnglish = "서울남산체 M"; 
             const fontKorean = "김남윤체";
